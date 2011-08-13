@@ -19,19 +19,24 @@ package org.sakaiproject.nakamura.lite.hbase;
 
 import com.google.common.collect.ImmutableMap;
 
+import org.sakaiproject.nakamura.api.lite.Configuration;
 import org.sakaiproject.nakamura.lite.accesscontrol.AbstractAccessControlManagerImplTest;
 import org.sakaiproject.nakamura.lite.content.BlockContentHelper;
 import org.sakaiproject.nakamura.lite.storage.StorageClientPool;
-import org.sakaiproject.nakamura.lite.storage.hbase.HBaseStorageClientPool;;
+import org.sakaiproject.nakamura.lite.storage.hbase.HBaseStorageClientPool;
+
+;
 
 public class AccessControlManagerImplMan extends AbstractAccessControlManagerImplTest {
 
-    @Override
-    protected StorageClientPool getClientPool() throws ClassNotFoundException {
-        HBaseStorageClientPool cp = new HBaseStorageClientPool();
-        cp.activate(ImmutableMap.of("test", (Object) "test",
-                BlockContentHelper.CONFIG_MAX_CHUNKS_PER_BLOCK, 9));
-        return cp;
-    }
+  @Override
+  protected StorageClientPool getClientPool(Configuration configuration)
+      throws ClassNotFoundException {
+    HBaseStorageClientPool cp = new HBaseStorageClientPool();
+    cp.activate(ImmutableMap.of("test", (Object) "test",
+        BlockContentHelper.CONFIG_MAX_CHUNKS_PER_BLOCK, 9, Configuration.class.getName(),
+        configuration));
+    return cp;
+  }
 
 }
