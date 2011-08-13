@@ -17,17 +17,24 @@
  */
 package org.sakaiproject.nakamura.lite.storage;
 
+import com.google.common.collect.ImmutableSet;
+
 import org.apache.commons.pool.PoolableObjectFactory;
 import org.apache.commons.pool.impl.GenericObjectPool;
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Deactivate;
 import org.apache.felix.scr.annotations.Property;
+import org.apache.felix.scr.annotations.Reference;
 import org.sakaiproject.nakamura.api.lite.ClientPoolException;
+import org.sakaiproject.nakamura.api.lite.Configuration;
+import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
+import org.sakaiproject.nakamura.lite.types.StringType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
+import java.util.Set;
 
 @Component(componentAbstract = true)
 public abstract class AbstractClientConnectionPool implements StorageClientPool {
@@ -55,6 +62,19 @@ public abstract class AbstractClientConnectionPool implements StorageClientPool 
     private static final String TEST_WHILE_IDLE = "test-while-idle";
     @Property(value = "grow")
     private static final String WHEN_EHAUSTED = "when-exhausted-action";
+    @Property(intValue = 0)
+    private static final String LONG_STRING_SIZE = "long-string-size";
+
+    public  static final String DEFAULT_FILE_STORE = "store";
+    @Property(value = "store")
+    public static final String FS_STORE_BASE_DIR = "store-base-dir";
+
+    @Reference
+    private Configuration configuration;
+
+    private Set<String> indexColums;
+
+
 
     private GenericObjectPool pool;
 
@@ -64,7 +84,12 @@ public abstract class AbstractClientConnectionPool implements StorageClientPool 
 
     @Activate
     public void activate(Map<String, Object> properties) throws ClassNotFoundException {
-        int maxActive = getProperty(properties.get(MAX_ACTIVE), 200);
+        // for testing purposes
+        if ( configuration == null ) {
+            configuration = (Configuration) properties.get(Configuration.class.getName());
+        }
+        indexColums = ImmutableSet.of(configuration.getIndexColumnNames());
+        int maxActive = StorageClientUtils.getSetting(properties.get(MAX_ACTIVE), 200);
         byte whenExhaustedAction = GenericObjectPool.DEFAULT_WHEN_EXHAUSTED_ACTION;
         String whenExhausted = (String) properties.get(WHEN_EHAUSTED);
         if ("fail".equals(whenExhausted)) {
@@ -74,30 +99,26 @@ public abstract class AbstractClientConnectionPool implements StorageClientPool 
         } else if ("block".equals(whenExhausted)) {
             whenExhaustedAction = GenericObjectPool.WHEN_EXHAUSTED_BLOCK;
         }
-        long maxWait = getProperty(properties.get(MAX_WAIT), 10L);
-        int maxIdle = getProperty(properties.get(MAX_IDLE), 5);
-        boolean testOnBorrow = getProperty(properties.get(TEST_ON_BORROW), true);
-        boolean testOnReturn = getProperty(properties.get(TEST_ON_RETURN), true);
-        long timeBetweenEvictionRunsMillis = getProperty(
+        long maxWait = StorageClientUtils.getSetting(properties.get(MAX_WAIT), 10L);
+        int maxIdle = StorageClientUtils.getSetting(properties.get(MAX_IDLE), 5);
+        boolean testOnBorrow = StorageClientUtils.getSetting(properties.get(TEST_ON_BORROW), true);
+        boolean testOnReturn = StorageClientUtils.getSetting(properties.get(TEST_ON_RETURN), true);
+        long timeBetweenEvictionRunsMillis = StorageClientUtils.getSetting(
                 properties.get(TIME_BETWEEN_EVICTION_RUNS_MILLIS), 60000L);
-        int numTestsPerEvictionRun = getProperty(properties.get(NUM_TESTS_PER_EVICTION_RUN), 1000);
-        long minEvictableIdleTimeMillis = getProperty(
+        int numTestsPerEvictionRun = StorageClientUtils.getSetting(properties.get(NUM_TESTS_PER_EVICTION_RUN), 1000);
+        long minEvictableIdleTimeMillis = StorageClientUtils.getSetting(
                 properties.get(MIN_EVICTABLE_IDLE_TIME_MILLIS), 10000L);
-        boolean testWhileIdle = getProperty(properties.get(TEST_WHILE_IDLE), false);
+        boolean testWhileIdle = StorageClientUtils.getSetting(properties.get(TEST_WHILE_IDLE), false);
 
         pool = new GenericObjectPool(getConnectionPoolFactory(), maxActive, whenExhaustedAction,
                 maxWait, maxIdle, testOnBorrow, testOnReturn, timeBetweenEvictionRunsMillis,
                 numTestsPerEvictionRun, minEvictableIdleTimeMillis, testWhileIdle);
+        
+        // set the maximum size of a string, if this is not 0, strings over this size will become files.
+        StringType.setLengthLimit(StorageClientUtils.getSetting(properties.get(LONG_STRING_SIZE),0));
 
     }
 
-    @SuppressWarnings("unchecked")
-    private <T> T getProperty(Object o, T l) {
-        if (o == null) {
-            return l;
-        }
-        return (T) o;
-    }
 
     protected abstract PoolableObjectFactory getConnectionPoolFactory();
 
@@ -112,6 +133,10 @@ public abstract class AbstractClientConnectionPool implements StorageClientPool 
         }
     }
 
+    public Set<String> getIndexColumns() {
+        return indexColums;
+    }
+
     /*
      * (non-Javadoc)
      * 
@@ -124,7 +149,7 @@ public abstract class AbstractClientConnectionPool implements StorageClientPool 
             LOGGER.debug("Borrowed storage client pool client:" + client);
             return client;
         } catch (Exception e) {
-            LOGGER.warn(e.getMessage(),e);
+            LOGGER.warn("Failed To Borrow connection from pool {} ",e.getMessage());
             throw new ClientPoolException("Failed To Borrow connection from pool ", e);
         }
     }

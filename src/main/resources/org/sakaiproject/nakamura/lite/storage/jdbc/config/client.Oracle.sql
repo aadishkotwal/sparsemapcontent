@@ -31,7 +31,6 @@ remove-string-column.n.cn = delete from cn_css where rid = ? and cid = ?
 find.n.au = select TR.rid, TR.cid, TR.v from (select a.rid, a.cid, a.v, ROWNUM rnum from au_css where {1} 1 = 1 {2}) TR where rnum > {4,number,#} and rnum <= {3,number,#}+{4,number,#};, au_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1}
 find.n.ac = select TR.rid, TR.cid, TR.v from (select a.rid, a.cid, a.v, ROWNUM rnum from ac_css where {1} 1 = 1 {2}) TR where rnum > {4,number,#} and rnum <= {3,number,#}+{4,number,#};, ac_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1}
 find.n.cn = select TR.rid, TR.cid, TR.v from (select a.rid, a.cid, a.v, ROWNUM rnum from cn_css where {1} 1 = 1 {2}) TR where rnum > {4,number,#} and rnum <= {3,number,#}+{4,number,#};, cn_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1}
-select-index-columns = select cid from index_cols
 
 block-select-row = select b from css_b where rid = ?
 block-delete-row = delete from css_b where rid = ?
@@ -59,6 +58,16 @@ block-find = select TR.rid from ( select s.rid, ROWNUM rnum from (select distinc
 block-find.n.au = select TR.rid from ( select s.rid, ROWNUM rnum from (select distinct a.rid {5} from au_css a {0} where {1} 1 = 1 {2}) s where ROWNUM <= {3,number,#}+{4,number,#}) TR where rnum  > {4,number,#};, au_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1} ;, {0}.v
 block-find.n.cn = select TR.rid from ( select s.rid, ROWNUM rnum from (select distinct a.rid {5} from cn_css a {0} where {1} 1 = 1 {2}) s where ROWNUM <= {3,number,#}+{4,number,#}) TR where rnum  > {4,number,#};, cn_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1} ;, {0}.v
 block-find.n.ac = select TR.rid from ( select s.rid, ROWNUM rnum from (select distinct a.rid {5} from ac_css a {0} where {1} 1 = 1 {2}) s where ROWNUM <= {3,number,#}+{4,number,#}) TR where rnum  > {4,number,#};, ac_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1} ;, {0}.v
+
+listchildren = select distinct a.rid {5} from css a {0} where {1} 1 = 1 {2};, css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1} ;, {0}.v
+listchildren.n.au = select distinct a.rid {5} from au_css a {0} where {1} 1 = 1 {2};, au_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1} ;, {0}.v
+listchildren.n.cn = select distinct a.rid {5} from cn_css a {0} where {1} 1 = 1 {2};, cn_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1} ;, {0}.v
+listchildren.n.ac = select distinct a.rid {5} from ac_css a {0} where {1} 1 = 1 {2};, ac_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1} ;, {0}.v
+
+countestimate = select count(*) from (select distinct a.rid {5} from css a {0} where {1} 1 = 1 {2});, css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1} ;, {0}.v
+countestimate.n.au = select count(*) from (select distinct a.rid {5} from au_css a {0} where {1} 1 = 1 {2});, au_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1} ;, {0}.v
+countestimate.n.cn = select count(*) from (select distinct a.rid {5} from cn_css a {0} where {1} 1 = 1 {2});, cn_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1} ;, {0}.v
+countestimate.n.ac = select count(*) from (select distinct a.rid {5} from ac_css a {0} where {1} 1 = 1 {2});, ac_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1} ;, {0}.v
 
 
 # statement to validate the connection

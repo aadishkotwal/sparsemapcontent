@@ -34,6 +34,7 @@ import org.apache.felix.scr.annotations.ReferencePolicy;
 import org.apache.felix.scr.annotations.Service;
 import org.sakaiproject.nakamura.api.lite.CacheHolder;
 import org.sakaiproject.nakamura.api.lite.ClientPoolException;
+import org.sakaiproject.nakamura.api.lite.Configuration;
 import org.sakaiproject.nakamura.api.lite.StorageCacheManager;
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
@@ -45,12 +46,15 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintWriter;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Enumeration;
 import java.util.Properties;
 import java.util.Timer;
 
@@ -94,7 +98,7 @@ public class JDBCStorageClientPool extends AbstractClientConnectionPool {
 
         public Object makeObject() throws Exception {
             return checkSchema(new JDBCStorageClient(JDBCStorageClientPool.this, properties,
-                    getSqlConfig(getConnection())));
+                    getSqlConfig(), getIndexColumns()));
         }
 
         public void passivateObject(Object obj) throws Exception {
@@ -162,16 +166,44 @@ public class JDBCStorageClientPool extends AbstractClientConnectionPool {
                 return sharedCache;
             }
         };
+        if ( LOGGER.isDebugEnabled()) {
+            DriverManager.setLogWriter(new PrintWriter(System.err));
+        }
 
-        String jdbcDriver = (String) properties.get(JDBC_DRIVER);
-        Class<?> clazz = Class.forName(jdbcDriver);
-
+        String jdbcDriver = StorageClientUtils.getSetting(properties.get(JDBC_DRIVER),"");
+        Class<?> driverClass = this.getClass().getClassLoader().loadClass(jdbcDriver);
+        if ( driverClass != null  ) {
+            LOGGER.info("Loaded Driver Class {} with classloader {} ", driverClass, driverClass.getClassLoader());
+            try {
+                Driver d = (Driver) driverClass.newInstance();
+                if ( d == null ) {
+                    LOGGER.error("Error creating driver instance, got null from {} ",driverClass);
+                } else {
+                    LOGGER.info("Created Driver Instance as {} ", d);
+                }
+            } catch (InstantiationException e) {
+                LOGGER.info("Error Creating Driver {} ", driverClass, e);
+            } catch (IllegalAccessException e) {
+                LOGGER.info("Error Creating Driver {} ", driverClass, e);
+            }
+        } else {
+            LOGGER.error("Failed to Load the DB Driver {}, unless the driver is available in the core bundle, it probably wont be found.", jdbcDriver);
+        }
         connectionProperties = getConnectionProperties(properties);
         username = StorageClientUtils.getSetting(properties.get(USERNAME), "");
         password = StorageClientUtils.getSetting(properties.get(PASSWORD), "");
         url = StorageClientUtils.getSetting(properties.get(CONNECTION_URL), "");
 
-        LOGGER.info("Loaded Database Driver {} as {}  ", jdbcDriver, clazz);
+        LOGGER.info("Loaded Database Driver {} as {}  ", jdbcDriver, driverClass);
+        boolean registered = false;
+        for ( Enumeration<Driver> ed = DriverManager.getDrivers(); ed.hasMoreElements();) {
+            registered = true;
+            Driver d = ed.nextElement();
+            LOGGER.info("JDBC Driver Registration [{}] [{}] [{}] ", new Object[]{d, d.getClass(), d.getClass().getClassLoader()});
+        }
+        if ( !registered ) {
+            LOGGER.warn("The SQL Driver has no drivers registered, did you ensure that that your Driver started up before this bundle ?");
+        }
         JDBCStorageClient client = null;
         try {
             client = (JDBCStorageClient) getClient();
@@ -196,8 +228,8 @@ public class JDBCStorageClientPool extends AbstractClientConnectionPool {
         timer.cancel();
         connectionManager.close();
 
-        String connectionUrl = (String) this.properties.get(CONNECTION_URL);
-        String jdbcDriver = (String) properties.get(JDBC_DRIVER);
+        String connectionUrl = StorageClientUtils.getSetting(this.properties.get(CONNECTION_URL),"");
+        String jdbcDriver = StorageClientUtils.getSetting(properties.get(JDBC_DRIVER),"");
         if ("org.apache.derby.jdbc.EmbeddedDriver".equals(jdbcDriver) && connectionUrl != null) {
             // need to shutdown this instance.
             String[] parts = StringUtils.split(connectionUrl, ';');
@@ -246,11 +278,17 @@ public class JDBCStorageClientPool extends AbstractClientConnectionPool {
         return client;
     }
 
+    public Map<String, Object> getSqlConfig() {
+        return getSqlConfig(null);
+    }
+
     public Map<String, Object> getSqlConfig(Connection connection) {
         synchronized (sqlConfigLock) {
             if (sqlConfig == null) {
                 try {
-
+                    if ( connection == null ) {
+                        connection = getConnection();
+                    }
                     for (String clientSQLLocation : getClientConfigLocations(connection)) {
                         String clientConfig = clientSQLLocation + ".sql";
                         InputStream in = this.getClass().getClassLoader()
@@ -275,7 +313,7 @@ public class JDBCStorageClientPool extends AbstractClientConnectionPool {
                         }
                     }
                 } catch (SQLException e) {
-                    LOGGER.error("Failed to locate SQL configuration");
+                    LOGGER.error("Failed to locate SQL configuration ",e);
                 }
             }
         }
@@ -298,7 +336,10 @@ public class JDBCStorageClientPool extends AbstractClientConnectionPool {
     private Properties getConnectionProperties(Map<String, Object> config) {
         Properties connectionProperties = new Properties();
         for (Entry<String, Object> e : config.entrySet()) {
-            connectionProperties.put(e.getKey(), e.getValue());
+            // dont add the configuration object that might be in the properties while unit testing.
+            if ( !(e.getValue() instanceof Configuration) ) {
+                connectionProperties.put(e.getKey(), e.getValue());
+            }
         }
         return connectionProperties;
     }

@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 
 import org.sakaiproject.nakamura.api.lite.ClientPoolException;
+import org.sakaiproject.nakamura.api.lite.Configuration;
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
 import org.sakaiproject.nakamura.lite.authorizable.AuthorizableActivator;
@@ -14,10 +15,11 @@ import org.sakaiproject.nakamura.lite.storage.mem.MemoryStorageClientPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.Map;
 
 /**
- * Utiltiy class to create an entirely in memorty Sparse Repository, usefull for
+ * Utility class to create an entirely in memory Sparse Repository, useful for
  * testing or bulk internal modifications.
  */
 public class BaseMemoryRepository {
@@ -29,9 +31,7 @@ public class BaseMemoryRepository {
     private RepositoryImpl repository;
 
     public BaseMemoryRepository() throws StorageClientException, AccessDeniedException,
-            ClientPoolException, ClassNotFoundException {
-        clientPool = getClientPool();
-        client = clientPool.getClient();
+            ClientPoolException, ClassNotFoundException, IOException {
         configuration = new ConfigurationImpl();
         Map<String, Object> properties = Maps.newHashMap();
         properties.put("keyspace", "n");
@@ -39,6 +39,8 @@ public class BaseMemoryRepository {
         properties.put("authorizable-column-family", "au");
         properties.put("content-column-family", "cn");
         configuration.activate(properties);
+        clientPool = getClientPool(configuration);
+        client = clientPool.getClient();
         AuthorizableActivator authorizableActivator = new AuthorizableActivator(client,
                 configuration);
         authorizableActivator.setup();
@@ -56,10 +58,11 @@ public class BaseMemoryRepository {
         client.close();
     }
 
-    protected StorageClientPool getClientPool() throws ClassNotFoundException {
+    protected StorageClientPool getClientPool(Configuration configuration) throws ClassNotFoundException {
         MemoryStorageClientPool cp = new MemoryStorageClientPool();
         cp.activate(ImmutableMap.of("test", (Object) "test",
-                BlockContentHelper.CONFIG_MAX_CHUNKS_PER_BLOCK, 9));
+                BlockContentHelper.CONFIG_MAX_CHUNKS_PER_BLOCK, 9,
+                Configuration.class.getName(), configuration));
         return cp;
     }
 

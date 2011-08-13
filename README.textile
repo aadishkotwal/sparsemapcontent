@@ -16,21 +16,18 @@ abstract level, but is making a positive effort and selfish effort to only provi
   The Implementation works on manipulating sparse objects in the Map with operations like get, insert and delete, but 
 has no understanding of the underlying implementation of the storage mechanism. 
 
-  At the moment we have 2 storage mechanisms implemented, In Memory using a HashMap, and Cassandra. The approach should 
-work on any Column Store (Dynamo, BigTable, Riak, Voldomort, Hbase etc) and can also work on RDBMS's including sharded storage.
+  At the moment we have 3 storage mechanisms implemented, In Memory using a HashMap, Cassandra and JDBC capable of doing sharded storage, The approach should 
+work on any Column Store (Dynamo, BigTable, Riak, Voldomort, Hbase etc).
 
-  At the moment there is no query support, expecting all access to be via column IDs, and multiple views to be written to the 
-underlying store.
-
-  The intention is to provide write through caches based on EhCache or Infinispan.
+  Query support is provided by finder messages that use index table written on update.
+  
+  Caching support is via an interface allowing external providers. In Nakamura there is an EhCache implementation and it would be a relatively simple task to write an Infinispan version.
 
   Transactions are supported, if supported by the underlying implementation of the storage, otherwise all operations are BASIC, non Atomic and immediate in nature. 
-We will add search indexes at some point using Lucene, perhaps in the form of Zoie
 
+  Search is provided in the form of a companion project that uses SolrJ 4
 
-  At this stage its pre-alpha, untested for performance and scalability and incomplete.
-
-
+  The JDBC Driver has configuration files for Derby, MySQL, Oracle, PostgreSQL.
 
 h2. Backlog
 
@@ -115,4 +112,18 @@ Throughput is users added per second.
 
 So far it looks like the code is concurrent, but MySQL is considerably slower than Cassandra or Memory. Below the Fighting for cores
 the box doesn't have enough CPUs to support the DB if present and the code.
+
+
+
+h1. Contributions, Patches, and License.
+
+The code in this code base is (c) Timefields Ltd and licensed to the Sakai Foundation under a Apache 2 Software License. Before making 
+a contribution by means of a patch or otherwise please ensure that you read and understand the terms under which a patch or contribution
+will be accepted, outlined in the NOTICES file. All patches and contributions are made under those terms with no exceptions.
+
+I am sorry if this sounds a bit legal, but I want to be able to always license this software to the Sakai Foundation under an Apache 2 license
+and so I have to insist that no contributions are made that would prevent that from happening. I cani't ask everyone who submits a patch to sign a 
+legal document, so this is the next best thing. If you have a problem with this approach, please email me and we can try and work it out.
+
+BTW, IANAL :)
 

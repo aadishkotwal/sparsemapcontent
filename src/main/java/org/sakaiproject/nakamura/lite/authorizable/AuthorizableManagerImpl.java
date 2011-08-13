@@ -17,11 +17,9 @@
  */
 package org.sakaiproject.nakamura.lite.authorizable;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableMap.Builder;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.lang.StringUtils;
 import org.sakaiproject.nakamura.api.lite.CacheHolder;
@@ -40,15 +38,18 @@ import org.sakaiproject.nakamura.api.lite.authorizable.Group;
 import org.sakaiproject.nakamura.api.lite.authorizable.User;
 import org.sakaiproject.nakamura.api.lite.util.PreemptiveIterator;
 import org.sakaiproject.nakamura.lite.CachingManager;
+import org.sakaiproject.nakamura.lite.accesscontrol.AccessControlManagerImpl;
 import org.sakaiproject.nakamura.lite.accesscontrol.AuthenticatorImpl;
+import org.sakaiproject.nakamura.lite.storage.DisposableIterator;
 import org.sakaiproject.nakamura.lite.storage.StorageClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMap.Builder;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 /**
  * An Authourizable Manager bound to a user, on creation the user ID specified
@@ -75,7 +76,7 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
     private StoreListener storeListener;
 
     public AuthorizableManagerImpl(User currentUser, StorageClient client,
-            Configuration configuration, AccessControlManager accessControlManager,
+            Configuration configuration, AccessControlManagerImpl accessControlManager,
             Map<String, CacheHolder> sharedCache, StoreListener storeListener) throws StorageClientException,
             AccessDeniedException {
         super(client, sharedCache);
@@ -91,6 +92,7 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
         this.authenticator = new AuthenticatorImpl(client, configuration);
         this.closed = false;
         this.storeListener = storeListener;
+        accessControlManager.setAuthorizableManager(this);
     }
 
     public User getUser() {
@@ -125,7 +127,18 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
             StorageClientException {
         checkOpen();
         String id = authorizable.getId();
+        if ( authorizable.isImmutable() ) {
+            throw new StorageClientException("You cant update an immutable authorizable:"+id);
+        }
+        if ( authorizable.isReadOnly() ) {
+            return;
+        }
         accessControlManager.check(Security.ZONE_AUTHORIZABLES, id, Permissions.CAN_WRITE);
+        if ( !authorizable.isModified() ) {
+            return;
+            // only perform the update and send the event if we see the authorizable as modified. It will be modified ig group membership was changed.
+        }
+
         /*
          * Update the principal records for members. The list of members that
          * have been added and removed is converted into a list of Authorzables.
@@ -239,6 +252,7 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
             }
         }
         attributes.add(type);
+        boolean wasNew = authorizable.isNew();
         Map<String, Object> beforeUpdateProperties = authorizable.getOriginalProperties();
 
         Map<String, Object> encodedProperties = StorageClientUtils.getFilteredAndEcodedMap(
@@ -250,7 +264,7 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
         authorizable.reset(getCached(keySpace, authorizableColumnFamily, id));
 
         String[] attrs = attributes.toArray(new String[attributes.size()]);
-        storeListener.onUpdate(Security.ZONE_AUTHORIZABLES, id, accessControlManager.getCurrentUserId(), true, beforeUpdateProperties, attrs);
+        storeListener.onUpdate(Security.ZONE_AUTHORIZABLES, id, accessControlManager.getCurrentUserId(), wasNew, beforeUpdateProperties, attrs);
 
         // for each added or removed member, send an UPDATE event so indexing can properly
         // record the groups each member is a member of.
@@ -339,10 +353,12 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
     public void delete(String authorizableId) throws AccessDeniedException, StorageClientException {
         checkOpen();
         accessControlManager.check(Security.ZONE_ADMIN, authorizableId, Permissions.CAN_DELETE);
-        removeFromCache(keySpace, authorizableColumnFamily, authorizableId);
-        client.remove(keySpace, authorizableColumnFamily, authorizableId);
-        storeListener.onDelete(Security.ZONE_AUTHORIZABLES, authorizableId, accessControlManager.getCurrentUserId(), null);
-
+        Authorizable authorizable = findAuthorizable(authorizableId);
+        if (authorizable != null){
+            removeFromCache(keySpace, authorizableColumnFamily, authorizableId);
+            client.remove(keySpace, authorizableColumnFamily, authorizableId);
+            storeListener.onDelete(Security.ZONE_AUTHORIZABLES, authorizableId, accessControlManager.getCurrentUserId(), authorizable.getOriginalProperties());
+        }
     }
 
     public void close() {
@@ -386,7 +402,7 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
 
     }
 
-    public Iterator<Authorizable> findAuthorizable(String propertyName, String value,
+    public DisposableIterator<Authorizable> findAuthorizable(String propertyName, String value,
             Class<? extends Authorizable> authorizableType) throws StorageClientException {
         Builder<String, Object> builder = ImmutableMap.builder();
         if (value != null) {
@@ -397,7 +413,7 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
         } else if (authorizableType.equals(Group.class)) {
             builder.put(Authorizable.AUTHORIZABLE_TYPE_FIELD, Authorizable.GROUP_VALUE);
         }
-        final Iterator<Map<String, Object>> authMaps = client.find(keySpace,
+        final DisposableIterator<Map<String, Object>> authMaps = client.find(keySpace,
                 authorizableColumnFamily, builder.build());
 
         return new PreemptiveIterator<Authorizable>() {
@@ -428,6 +444,7 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
                             LOGGER.debug("Search result filtered ", e.getMessage());
                         } catch (StorageClientException e) {
                             LOGGER.error("Failed to check ACLs ", e.getMessage());
+                            close();
                             return false;
                         }
 
@@ -435,6 +452,7 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
                 }
 
                 authorizable = null;
+                close();
                 return false;
             }
 
@@ -442,7 +460,11 @@ public class AuthorizableManagerImpl extends CachingManager implements Authoriza
             protected Authorizable internalNext() {
                 return authorizable;
             }
-
+            @Override
+            public void close() {
+                authMaps.close();
+                super.close();
+            }
 
         };
     }

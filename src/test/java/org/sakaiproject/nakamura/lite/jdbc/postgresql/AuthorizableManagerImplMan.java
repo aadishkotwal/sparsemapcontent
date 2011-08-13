@@ -15,16 +15,17 @@
  * KIND, either express or implied. See the License for the
  * specific language governing permissions and limitations under the License.
  */
-package org.sakaiproject.nakamura.lite.jdbc.oracle;
+package org.sakaiproject.nakamura.lite.jdbc.postgresql;
 
-import org.sakaiproject.nakamura.lite.content.AbstractContentManagerTest;
+import org.sakaiproject.nakamura.api.lite.Configuration;
+import org.sakaiproject.nakamura.lite.authorizable.AbstractAuthorizableManagerImplTest;
 import org.sakaiproject.nakamura.lite.storage.StorageClientPool;
 
-public class ContentManagerImplTest extends AbstractContentManagerTest {
+public class AuthorizableManagerImplMan extends AbstractAuthorizableManagerImplTest {
 
     @Override
-    protected StorageClientPool getClientPool() throws ClassNotFoundException {
-        return OracleSetup.getClientPool();
+    protected StorageClientPool getClientPool(Configuration configuration) throws ClassNotFoundException {
+        return PostgreSQLSetup.getClientPool(configuration);
     }
 
 }

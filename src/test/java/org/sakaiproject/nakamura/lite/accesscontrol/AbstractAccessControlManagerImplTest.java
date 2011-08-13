@@ -28,6 +28,7 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.sakaiproject.nakamura.api.lite.ClientPoolException;
+import org.sakaiproject.nakamura.api.lite.Configuration;
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessControlManager;
@@ -53,6 +54,7 @@ import org.sakaiproject.nakamura.lite.storage.StorageClientPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -69,22 +71,22 @@ public abstract class AbstractAccessControlManagerImplTest {
 
     @Before
     public void before() throws StorageClientException, AccessDeniedException, ClientPoolException,
-            ClassNotFoundException {
-        clientPool = getClientPool();
-        client = clientPool.getClient();
+            ClassNotFoundException, IOException {
         configuration = new ConfigurationImpl();
         Map<String, Object> properties = Maps.newHashMap();
         properties.put("keyspace", "n");
         properties.put("acl-column-family", "ac");
         properties.put("authorizable-column-family", "au");
         configuration.activate(properties);
+        clientPool = getClientPool(configuration);
+        client = clientPool.getClient();
         AuthorizableActivator authorizableActivator = new AuthorizableActivator(client,
                 configuration);
         authorizableActivator.setup();
         LOGGER.info("Setup Complete");
     }
 
-    protected abstract StorageClientPool getClientPool() throws ClassNotFoundException;
+    protected abstract StorageClientPool getClientPool(Configuration configuration) throws ClassNotFoundException;
 
     @After
     public void after() throws ClientPoolException {
@@ -101,12 +103,12 @@ public abstract class AbstractAccessControlManagerImplTest {
 
         AccessControlManagerImpl accessControlManagerImpl = new AccessControlManagerImpl(client,
                 currentUser, configuration, null, new LoggingStorageListener(), principalValidatorResolver);
-        AclModification user1 = new AclModification(u1, Permissions.CAN_ANYTHING.combine(
+        AclModification user1 = new AclModification(AclModification.grantKey(u1), Permissions.CAN_ANYTHING.combine(
                 Permissions.CAN_ANYTHING_ACL).getPermission(), AclModification.Operation.OP_REPLACE);
-        AclModification user2 = new AclModification(u2, Permissions.CAN_READ
+        AclModification user2 = new AclModification(AclModification.grantKey(u2), Permissions.CAN_READ
                 .combine(Permissions.CAN_WRITE).combine(Permissions.CAN_DELETE).getPermission(),
                 AclModification.Operation.OP_REPLACE);
-        AclModification user3 = new AclModification(u3, Permissions.CAN_READ.getPermission(),
+        AclModification user3 = new AclModification(AclModification.grantKey(u3), Permissions.CAN_READ.getPermission(),
                 AclModification.Operation.OP_REPLACE);
         String basepath = "testpath"+System.currentTimeMillis();
 
@@ -117,12 +119,12 @@ public abstract class AbstractAccessControlManagerImplTest {
                 basepath);
         Assert.assertEquals(Integer.toHexString(Permissions.CAN_ANYTHING.combine(
                 Permissions.CAN_ANYTHING_ACL).getPermission()), Integer
-                .toHexString((Integer) acl.get(u1)));
+                .toHexString((Integer) acl.get(AclModification.grantKey(u1))));
         Assert.assertEquals(
                 Permissions.CAN_READ.combine(Permissions.CAN_WRITE).combine(Permissions.CAN_DELETE)
-                        .getPermission(), ((Integer)acl.get(u2)).intValue());
+                        .getPermission(), ((Integer)acl.get(AclModification.grantKey(u2))).intValue());
         Assert.assertEquals(Permissions.CAN_READ.getPermission(),
-                ((Integer)acl.get(u3)).intValue());
+                ((Integer)acl.get(AclModification.grantKey(u3))).intValue());
         for (Entry<String, Object> e : acl.entrySet()) {
             LOGGER.info(" ACE {} : {} ", e.getKey(), e.getValue());
         }
@@ -208,17 +210,17 @@ public abstract class AbstractAccessControlManagerImplTest {
         Assert.assertArrayEquals(new String[] {}, acl.keySet().toArray());
 
         acl = accessControlManagerImpl.getAcl(Security.ZONE_CONTENT, basepath+"/a");
-        acl = StorageClientUtils.getFilterMap(acl, null,null,ImmutableSet.of("_aclKey","_aclPath","_aclType"));
+        acl = StorageClientUtils.getFilterMap(acl, null,null,ImmutableSet.of("_aclKey","_aclPath","_aclType"), false);
         Assert.assertArrayEquals(Arrays.toString(sortToArray(acl.keySet())),
                 new String[] { AclModification.grantKey(u1), AclModification.grantKey(u3) },
                 sortToArray(acl.keySet()));
         acl = accessControlManagerImpl.getAcl(Security.ZONE_CONTENT, basepath+"/a/b");
-        acl = StorageClientUtils.getFilterMap(acl, null,null,ImmutableSet.of("_aclKey","_aclPath","_aclType"));
+        acl = StorageClientUtils.getFilterMap(acl, null,null,ImmutableSet.of("_aclKey","_aclPath","_aclType"), false);
         Assert.assertArrayEquals(
                 new String[] { AclModification.grantKey(u1), AclModification.grantKey(u2) },
                 sortToArray(acl.keySet()));
         acl = accessControlManagerImpl.getAcl(Security.ZONE_CONTENT, basepath+"/a/b/c");
-        acl = StorageClientUtils.getFilterMap(acl, null,null,ImmutableSet.of("_aclKey","_aclPath","_aclType"));
+        acl = StorageClientUtils.getFilterMap(acl, null,null,ImmutableSet.of("_aclKey","_aclPath","_aclType"), false);
         Assert.assertArrayEquals(new String[] { AclModification.denyKey(User.ANON_USER),
                 AclModification.denyKey(Group.EVERYONE), AclModification.grantKey(u1),
                 AclModification.denyKey(u2), AclModification.denyKey(u3) },
@@ -377,10 +379,10 @@ public abstract class AbstractAccessControlManagerImplTest {
                 Security.ZONE_CONTENT,
                 targetContentPath,
                 new AclModification[] {
-                    new AclModification(AclModification.grantKey(tokenPrincipal),
-                        grantedBitmap, Operation.OP_REPLACE),
                     new AclModification(AclModification.denyKey(tokenPrincipal), deniedBitmap,
                         Operation.OP_REPLACE),
+                    new AclModification(AclModification.grantKey(tokenPrincipal),
+                                grantedBitmap, Operation.OP_REPLACE),
                       new AclModification(AclModification.denyKey(Group.EVERYONE), Permissions.CAN_READ.getPermission(),
                                 Operation.OP_REPLACE),
                                 new AclModification(AclModification.denyKey(User.ANON_USER), Permissions.CAN_READ.getPermission(),
@@ -428,11 +430,11 @@ public abstract class AbstractAccessControlManagerImplTest {
                 Security.ZONE_CONTENT,
                 targetContentPath,
                 new AclModification[] {
+                    new AclModification(AclModification.denyKey(tokenPrincipal), deniedBitmap,
+                                Operation.OP_REPLACE),
                     new AclModification(AclModification.grantKey(tokenPrincipal),
                         grantedBitmap, Operation.OP_REPLACE),
-                    new AclModification(AclModification.denyKey(tokenPrincipal), deniedBitmap,
-                        Operation.OP_REPLACE),
-                      new AclModification(AclModification.denyKey(Group.EVERYONE), Permissions.CAN_READ.getPermission(),
+                    new AclModification(AclModification.denyKey(Group.EVERYONE), Permissions.CAN_READ.getPermission(),
                                 Operation.OP_REPLACE),
                                 new AclModification(AclModification.denyKey(User.ANON_USER), Permissions.CAN_READ.getPermission(),
                                         Operation.OP_REPLACE)

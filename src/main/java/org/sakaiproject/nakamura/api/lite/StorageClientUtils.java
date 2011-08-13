@@ -225,6 +225,15 @@ public class StorageClientUtils {
     // TODO: Unit test
     public static String insecureHash(String naked) {
         try {
+            return insecureHash(naked.getBytes(UTF8));
+        } catch (UnsupportedEncodingException e3) {
+            LOGGER.error("no UTF-8 Envoding, get a real JVM, nothing will work here. NPE to come");
+            return null;
+        }
+    }
+
+    public static String insecureHash(byte[] b) {
+        try {
             MessageDigest md;
             try {
                 md = MessageDigest.getInstance("SHA-1");
@@ -234,10 +243,10 @@ public class StorageClientUtils {
                 } catch (NoSuchAlgorithmException e2) {
                     LOGGER.error("You have no Message Digest Algorightms intalled in this JVM, secure Hashes are not availalbe, encoding bytes :"
                             + e2.getMessage());
-                    return encode(StringUtils.leftPad(naked, 10, '_').getBytes(UTF8));
+                    return encode(StringUtils.leftPad((new String(b,"UTF-8")), 10, '_').getBytes(UTF8));
                 }
             }
-            byte[] bytes = md.digest(naked.getBytes(UTF8));
+            byte[] bytes = md.digest(b);
             return encode(bytes);
         } catch (UnsupportedEncodingException e3) {
             LOGGER.error("no UTF-8 Envoding, get a real JVM, nothing will work here. NPE to come");
@@ -299,16 +308,18 @@ public class StorageClientUtils {
 
     /**
      * Converts to an Immutable map, with keys that are in the filter not
-     * transdered. Nested maps are also transfered.
+     * transfered. Nested maps are also transfered.
      * 
-     * @param <K>
-     * @param <V>
-     * @param source
-     * @param filter
-     * @return
+     * @param <K> the type of the key
+     * @param <V> the type of the value
+     * @param source a map of values to start with
+     * @param modified a map to oveeride values in source
+     * @param include if not null, only include these keys in the returned map
+     * @param exclude if not null, exclude these keys from the returned map
+     * @return a map with the modifications applied and filtered by the includes and excludes
      */
     @SuppressWarnings("unchecked")
-    public static <K, V> Map<K, V> getFilterMap(Map<K, V> source, Map<K, V> modified, Set<K> include, Set<K> exclude) {
+    public static <K, V> Map<K, V> getFilterMap(Map<K, V> source, Map<K, V> modified, Set<K> include, Set<K> exclude, boolean includingRemoveProperties ) {
        if ((modified == null || modified.size() == 0) && (include == null) && ( exclude == null || exclude.size() == 0)) {
            if ( source instanceof ImmutableMap ) {
                return source;
@@ -316,6 +327,7 @@ public class StorageClientUtils {
                return ImmutableMap.copyOf(source);
            }
         }
+
         Builder<K, V> filteredMap = new ImmutableMap.Builder<K, V>();
         for (Entry<K, V> e : source.entrySet()) {
             K k = e.getKey();
@@ -325,7 +337,9 @@ public class StorageClientUtils {
                         V o = modified.get(k);
                         if (o instanceof Map) {
                             filteredMap.put(k,
-                                    (V) getFilterMap((Map<K, V>) o, null, null, exclude));
+                                    (V) getFilterMap((Map<K, V>) o, null, null, exclude, includingRemoveProperties));
+                        } else if ( includingRemoveProperties ) {
+                            filteredMap.put(k, o);
                         } else if ( !(o instanceof RemoveProperty) ) {
                             filteredMap.put(k, o);
                         }
@@ -333,7 +347,7 @@ public class StorageClientUtils {
                         Object o = e.getValue();
                         if (o instanceof Map) {
                             filteredMap.put(k,
-                                    (V) getFilterMap((Map<K, V>) e.getValue(), null, null, exclude));
+                                    (V) getFilterMap((Map<K, V>) e.getValue(), null, null, exclude, includingRemoveProperties));
                         } else {
                             filteredMap.put(k, e.getValue());
                         }
@@ -361,9 +375,9 @@ public class StorageClientUtils {
      * over depth of nesting. Keys in the filter set are not transfered
      * Resulting map is mutable.
      * 
-     * @param source
-     * @param filter
-     * @return
+     * @param source a map of values to modify
+     * @param filter a map of values to remove by key from source
+     * @return the map less any keys from filter
      */
     @SuppressWarnings("unchecked")
     public static Map<String, Object> getFilteredAndEcodedMap(Map<String, Object> source,
@@ -467,6 +481,21 @@ public class StorageClientUtils {
     @SuppressWarnings("unchecked")
     public static <T> T getSetting(Object setting, T defaultValue) {
         if (setting != null) {
+            if (defaultValue.getClass().isAssignableFrom(setting.getClass())) {
+                return (T) setting;
+            }
+            // handle conversions
+            if ( defaultValue instanceof Long ) {
+                return (T) new Long(String.valueOf(setting));
+            } else if ( defaultValue instanceof Integer ) {
+                return (T) new Integer(String.valueOf(setting));
+            } else if (defaultValue instanceof Boolean ) {
+                return (T) new Boolean(String.valueOf(setting));
+            } else if ( defaultValue instanceof Double ) {
+                return (T) new Double(String.valueOf(setting));
+            } else if ( defaultValue instanceof String[] ) {
+                return (T) StringUtils.split(String.valueOf(setting), ',');
+            }
             return (T) setting;
         }
         return defaultValue;
@@ -589,6 +618,14 @@ public class StorageClientUtils {
         }
     }
 
+    /**
+     * Make the method on the target object accessible and then invoke it.
+     * @param target the object with the method to invoke
+     * @param methodName the name of the method to invoke
+     * @param args the arguments to pass to the invoked method
+     * @param argsTypes the types of the arguments being passed to the method
+     * @return
+     */
     private static Object safeMethod(Object target, String methodName, Object[] args,
             @SuppressWarnings("rawtypes") Class[] argsTypes) {
         if (target != null) {
@@ -634,6 +671,10 @@ public class StorageClientUtils {
             }
         }
         contentManager.delete(path);
+    }
+
+    public static String getInternalUuid() {
+        return getUuid()+"+"; // URL safe base 64 does not use + chars
     }
 
 }

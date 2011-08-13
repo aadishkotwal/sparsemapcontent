@@ -60,6 +60,14 @@ public interface ContentManager {
     Iterable<Content> find(Map<String, Object> searchProperties) throws StorageClientException, AccessDeniedException;
 
     /**
+     * Counts the maximum number of results a find operation could return, ignoring access control. This method may cause problems
+     * if used inappropriately on sets of results that are mostly not readable by the current user (eg how many documents are there with "ieb" and "your fired" in ?)
+     * @param searchProperties Map the same as the finder
+     * @return maximum number of results a find could return.
+     */
+    int count(Map<String, Object> countSearch) throws StorageClientException;
+
+    /**
      * Save the current version of the content object including metadata and
      * file bodies as a read only snapshot
      * 
@@ -211,7 +219,7 @@ public interface ContentManager {
      *            the path to copy from, must exist
      * @param to
      *            the path to copy to, must not exist
-     * @param deep
+     * @param withStreams
      *            if true, a copy is made of all the streams, if false the
      *            streams are shared but copies are made of the properties.
      * @throws IOException
@@ -219,7 +227,7 @@ public interface ContentManager {
      *             if the user cant read the source or write the desination.
      * @throws IOException
      */
-    void copy(String from, String to, boolean deep) throws StorageClientException,
+    void copy(String from, String to, boolean withStreams) throws StorageClientException,
             AccessDeniedException, IOException;
 
     /**
@@ -358,5 +366,17 @@ public interface ContentManager {
      * Clear the principal Token Resolver
      */
     void cleanPrincipalTokenResolver();
+
+
+    /**
+     * Put the content manager into maintanence mode to allow an admin session to gain control over protected content properties.
+     * Only use this in migration. Never use it in runtime production as you will risk breaking the referential integrety
+     * of the internal content model. Also, please ensure that your code matches the same content model being used by 
+     * the target ContentManagerImpl, before you enable maintanence mode. Failure to do so may destroy your content.
+     */
+    void setMaintanenceMode(boolean maintanenceMode);
+
+
+
 
 }

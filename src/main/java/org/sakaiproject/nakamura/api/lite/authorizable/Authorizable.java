@@ -120,6 +120,8 @@ public class Authorizable {
 
     protected static final Logger LOGGER = LoggerFactory.getLogger(Authorizable.class);
 
+    private static final Set<String> IMMUTABLE_AUTH_IDS = ImmutableSet.of(Group.EVERYONE);
+
     /**
      * A read only copy of the map, protected by an Immutable Wrapper
      */
@@ -152,6 +154,8 @@ public class Authorizable {
      * true if the object is read only.
      */
     protected boolean readOnly;
+
+    private boolean immutable;
 
     public Authorizable(Map<String, Object> autorizableMap) {
         principalsModified = false;
@@ -215,7 +219,7 @@ public class Authorizable {
             modifiedMap.put(PRINCIPALS_FIELD, StringUtils.join(principals, ';'));
         }
         return StorageClientUtils.getFilterMap(authorizableMap, modifiedMap, null,
-                FILTER_PROPERTIES);
+                FILTER_PROPERTIES, false);
     }
 
     /**
@@ -229,7 +233,7 @@ public class Authorizable {
      * @return get the orriginal properties of this authorizable ignoring any unsaved properties.
      */
     public Map<String, Object> getOriginalProperties() {
-        return StorageClientUtils.getFilterMap(authorizableMap, null, null, FILTER_PROPERTIES);
+        return StorageClientUtils.getFilterMap(authorizableMap, null, null, FILTER_PROPERTIES, false);
     }
 
     /**
@@ -240,7 +244,11 @@ public class Authorizable {
     public void setProperty(String name, Object value) {
         if (!readOnly && !FILTER_PROPERTIES.contains(name)) {
             Object cv = authorizableMap.get(name);
-            if (!value.equals(cv)) {
+            if ( value == null  ) {
+                if ( cv != null && !(cv instanceof RemoveProperty)) {
+                    modifiedMap.put(name, new RemoveProperty());
+                }
+            } else if (!value.equals(cv)) {
                 modifiedMap.put(name, value);
             } else if (modifiedMap.containsKey(name) && !value.equals(modifiedMap.get(name))) {
                 modifiedMap.put(name, value);
@@ -301,7 +309,7 @@ public class Authorizable {
     }
 
     /**
-     * @return a Map or properties that should be saved to storage. This merges the orriginal properties and unsaved changed.
+     * @return a Map or properties that should be saved to storage. This merges the original properties and unsaved changed.
      */
     public Map<String, Object> getPropertiesForUpdate() {
         if (!readOnly && principalsModified) {
@@ -310,7 +318,7 @@ public class Authorizable {
             principals.add(Group.EVERYONE);
         }
         return StorageClientUtils.getFilterMap(authorizableMap, modifiedMap, null,
-                FILTER_PROPERTIES);
+                FILTER_PROPERTIES, true);
     }
 
     /**
@@ -370,6 +378,7 @@ public class Authorizable {
                         LOGGER.debug(e.getMessage(), e);
                     }
                 }
+                close();
                 return false;
             }
 
@@ -403,6 +412,9 @@ public class Authorizable {
             this.readOnly = readOnly;
         }
     }
+    public boolean isReadOnly() {
+        return readOnly;
+    }
 
     @Override
     public int hashCode() {
@@ -426,5 +438,9 @@ public class Authorizable {
     @Override
     public String toString() {
         return id;
+    }
+
+    public boolean isImmutable() {
+        return immutable || IMMUTABLE_AUTH_IDS.contains(id);
     }
 }

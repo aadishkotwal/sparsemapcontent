@@ -28,8 +28,6 @@ validate = values(1)
 rowid-hash = SHA1
 
 
-select-index-columns = select cid from index_cols
-
 
 block-select-row = select b from css_b where rid = ?
 block-delete-row = delete from css_b where rid = ?
@@ -57,6 +55,18 @@ block-find = select TR.rid from (select s.rid, ROW_NUMBER() OVER () AS R from (s
 block-find.n.au = select TR.rid from (select s.rid, ROW_NUMBER() OVER () AS R from (select distinct a.rid  {5} from au_css a {0} where {1} 1 = 1 {2}) as s) as TR where TR.R > {4,number,#} and TR.R <= {3,number,#}+{4,number,#};, au_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1};, {0}.v
 block-find.n.ac = select TR.rid from (select s.rid, ROW_NUMBER() OVER () AS R from (select distinct a.rid  {5} from ac_css a {0} where {1} 1 = 1 {2}) as s) as TR where TR.R > {4,number,#} and TR.R <= {3,number,#}+{4,number,#};, ac_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1};, {0}.v
 block-find.n.cn = select TR.rid from (select s.rid, ROW_NUMBER() OVER () AS R from (select distinct a.rid  {5} from cn_css a {0} where {1} 1 = 1 {2}) as s) as TR where TR.R > {4,number,#} and TR.R <= {3,number,#}+{4,number,#};, cn_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1};, {0}.v
+
+# Optimized queries to find children
+listchildren = select distinct a.rid {5} from css a {0} where {1} 1 = 1 {2};, css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1} ;, {0}.v
+listchildren.n.au = select distinct a.rid  {5} from au_css a {0} where {1} 1 = 1 {2};, au_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1};, {0}.v
+listchildren.n.ac = select distinct a.rid  {5} from ac_css a {0} where {1} 1 = 1 {2};, ac_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1};, {0}.v
+listchildren.n.cn = select distinct a.rid  {5} from cn_css a {0} where {1} 1 = 1 {2};, cn_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1};, {0}.v
+
+# Optimized queries estimate the count of any query.
+countestimate = select count(*) from (select distinct a.rid {5} from css a {0} where {1} 1 = 1 {2}) as tocount;, css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1} ;, {0}.v
+countestimate.n.au = select count(*) from (select distinct a.rid  {5} from au_css a {0} where {1} 1 = 1 {2}) as tocount;, au_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1};, {0}.v
+countestimate.n.ac = select count(*) from (select distinct a.rid  {5} from ac_css a {0} where {1} 1 = 1 {2}) as tocount;, ac_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1};, {0}.v
+countestimate.n.cn = select count(*) from (select distinct a.rid  {5} from cn_css a {0} where {1} 1 = 1 {2}) as tocount;, cn_css {0} ; {0}.cid = ? and {0}.v = ? and {0}.rid = a.rid ; {0}.cid = ? and {0}.rid = a.rid ; order by {0}.v {1};, {0}.v
 
 use-batch-inserts = 0
 

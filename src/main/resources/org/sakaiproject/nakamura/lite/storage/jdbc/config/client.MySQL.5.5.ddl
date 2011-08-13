@@ -4,7 +4,7 @@
 # The access mechanism must be update then insert to allow no PK and no Unique key.
 # Please read http://harrison-fisk.blogspot.com/2009/02/my-favorite-new-feature-of-mysql-51.html for info.
 
-DROP TABLE IF EXISTS `css`;
+#### DROP TABLE IF EXISTS `css`;
 
 CREATE TABLE  `css` (
   `id` INT NOT NULL AUTO_INCREMENT,
@@ -17,7 +17,7 @@ CREATE TABLE  `css` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
-DROP TABLE IF EXISTS `au_css`;
+##### DROP TABLE IF EXISTS `au_css`;
 
 CREATE TABLE  `au_css` (
   `id` INT NOT NULL AUTO_INCREMENT,
@@ -29,7 +29,7 @@ CREATE TABLE  `au_css` (
   KEY `cid_locate_i` (`v`(255),`cid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
-DROP TABLE IF EXISTS `cn_css`;
+###### DROP TABLE IF EXISTS `cn_css`;
 
 CREATE TABLE  `cn_css` (
   `id` INT NOT NULL AUTO_INCREMENT,
@@ -42,7 +42,7 @@ CREATE TABLE  `cn_css` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
-DROP TABLE IF EXISTS `ac_css`;
+###### DROP TABLE IF EXISTS `ac_css`;
 
 CREATE TABLE  `ac_css` (
   `id` INT NOT NULL AUTO_INCREMENT,
@@ -89,30 +89,4 @@ CREATE TABLE  `ac_css_b` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
-# This table stores the colunms that are indexed
 
-CREATE TABLE  `index_cols` (
-  `cid` varchar(64) NOT NULL,
-  PRIMARY KEY  (`cid`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-insert into index_cols (cid) values ('au:rep:principalName');
-insert into index_cols (cid) values ('au:type');
-insert into index_cols (cid) values ('cn:sling:resourceType');
-insert into index_cols (cid) values ('cn:sakai:pooled-content-manager');
-# /var/search/comments/discussions/threaded.json
-insert into index_cols (cid) values ('cn:sakai:messagestore');
-insert into index_cols (cid) values ('cn:sakai:type');
-insert into index_cols (cid) values ('cn:sakai:marker');
-# *.tagged.json 
-insert into index_cols (cid) values ('cn:sakai:tag-uuid');
-# /var/contacts/findstate.json
-insert into index_cols (cid) values ('cn:sakai:contactstorepath');
-insert into index_cols (cid) values ('cn:sakai:state');
-# content sorting
-insert into index_cols (cid) values ('cn:_created');
-# /var/message/boxcategory.json
-insert into index_cols (cid) values ('cn:sakai:category');
-insert into index_cols (cid) values ('cn:sakai:messagebox');
-insert into index_cols (cid) values ('cn:sakai:from');
-insert into index_cols (cid) values ('cn:sakai:subject');

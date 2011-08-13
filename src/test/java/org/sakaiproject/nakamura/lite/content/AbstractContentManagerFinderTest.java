@@ -14,6 +14,7 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.sakaiproject.nakamura.api.lite.ClientPoolException;
+import org.sakaiproject.nakamura.api.lite.Configuration;
 import org.sakaiproject.nakamura.api.lite.StorageClientException;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
 import org.sakaiproject.nakamura.api.lite.accesscontrol.AccessDeniedException;
@@ -32,6 +33,7 @@ import org.sakaiproject.nakamura.lite.storage.StorageClientPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
@@ -47,9 +49,7 @@ public abstract class AbstractContentManagerFinderTest {
 
     @Before
     public void before() throws StorageClientException, AccessDeniedException, ClientPoolException,
-            ClassNotFoundException {
-        clientPool = getClientPool();
-        client = clientPool.getClient();
+            ClassNotFoundException, IOException {
         configuration = new ConfigurationImpl();
         Map<String, Object> properties = Maps.newHashMap();
         properties.put("keyspace", "n");
@@ -57,13 +57,15 @@ public abstract class AbstractContentManagerFinderTest {
         properties.put("authorizable-column-family", "au");
         properties.put("content-column-family", "cn");
         configuration.activate(properties);
+        clientPool = getClientPool(configuration);
+        client = clientPool.getClient();
         AuthorizableActivator authorizableActivator = new AuthorizableActivator(client,
                 configuration);
         authorizableActivator.setup();
         LOGGER.info("Setup Complete");
     }
 
-    protected abstract StorageClientPool getClientPool() throws ClassNotFoundException;
+    protected abstract StorageClientPool getClientPool(Configuration configuration) throws ClassNotFoundException;
 
     @After
     public void after() throws ClientPoolException {
@@ -1200,6 +1202,31 @@ public abstract class AbstractContentManagerFinderTest {
     Iterable<Content> findOfOldval = contentManager.find(ImmutableMap.of("sakai:marker", (Object) oldValue));
     // if find() is correct this line should pass
     Assert.assertFalse(findOfOldval.iterator().hasNext());
+  }
+
+  @Test
+  public void testCountTest() throws StorageClientException, AccessDeniedException {
+      AuthenticatorImpl AuthenticatorImpl = new AuthenticatorImpl(client, configuration);
+      User currentUser = AuthenticatorImpl.authenticate("admin", "admin");
+
+      AccessControlManagerImpl accessControlManager = new AccessControlManagerImpl(client,
+              currentUser, configuration, null, new LoggingStorageListener(),
+              principalValidatorResolver);
+
+      ContentManagerImpl contentManager = new ContentManagerImpl(client, accessControlManager,
+              configuration, null, new LoggingStorageListener());
+      contentManager.update(new Content("/simpleFind", ImmutableMap.of("sakai:marker",
+              (Object) "testSimpleFindvalue1")));
+      contentManager.update(new Content("/simpleFind/item2", ImmutableMap.of("sakai:marker",
+              (Object) "testSimpleFindvalue1")));
+      contentManager.update(new Content("/simpleFind/test", ImmutableMap.of("sakai:marker",
+              (Object) "testSimpleFindvalue3")));
+      contentManager.update(new Content("/simpleFind/test/ing", ImmutableMap.of("sakai:marker",
+              (Object) "testSimpleFindvalue4")));
+
+      Assert.assertEquals(1, contentManager.count(ImmutableMap.of("sakai:marker", (Object) "testSimpleFindvalue4")));
+      Assert.assertEquals(2, contentManager.count(ImmutableMap.of("sakai:marker", (Object) "testSimpleFindvalue1")));
+
   }
 
 }

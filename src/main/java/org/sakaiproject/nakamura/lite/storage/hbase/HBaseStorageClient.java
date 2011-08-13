@@ -34,6 +34,7 @@ import org.sakaiproject.nakamura.lite.content.BlockContentHelper;
 import org.sakaiproject.nakamura.lite.content.BlockSetContentHelper;
 import org.sakaiproject.nakamura.lite.storage.Disposable;
 import org.sakaiproject.nakamura.lite.storage.DisposableIterator;
+import org.sakaiproject.nakamura.lite.storage.Disposer;
 import org.sakaiproject.nakamura.lite.storage.StorageClient;
 import org.sakaiproject.nakamura.lite.types.Types;
 import org.sakaiproject.nakamura.api.lite.RemoveProperty;
@@ -208,8 +209,8 @@ public class HBaseStorageClient implements StorageClient {
   private boolean shouldIndex(String keySpace, String columnFamily, String columnName)
       throws StorageClientException {
 
-    String properties = new ConfigurationImpl().getPropertiesIndexColumnName();
-    Set<String> indexColumns = ImmutableSet.of(properties.split(","));
+    String properties[] = new ConfigurationImpl().getIndexColumnNames();
+    Set<String> indexColumns = ImmutableSet.of(properties);
 
     if (indexColumns.contains(columnFamily + ":" + columnName)) {
       LOGGER.debug("Should Index {}:{}", columnFamily, columnName);
@@ -255,7 +256,7 @@ public class HBaseStorageClient implements StorageClient {
         streamId, nBlocks);
   }
 
-  public Iterator<Map<String, Object>> find(String keySpace,
+  public DisposableIterator<Map<String, Object>> find(String keySpace,
       String authorizableColumnFamily, Map<String, Object> properties)
       throws StorageClientException {
     final String fKeyspace = keySpace;
@@ -352,6 +353,7 @@ public class HBaseStorageClient implements StorageClient {
 
     if (tResultRows.isEmpty()) {
       return new DisposableIterator<Map<String, Object>>() {
+        private Disposer disposer;
 
         public boolean hasNext() {
           return false;
@@ -365,6 +367,13 @@ public class HBaseStorageClient implements StorageClient {
         }
 
         public void close() {
+          if (disposer != null) {
+            disposer.unregisterDisposable(this);
+          }
+        }
+
+        public void setDisposer(Disposer disposer) {
+          this.disposer = disposer;        
         }
       };
     }
