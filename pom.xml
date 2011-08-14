@@ -295,6 +295,18 @@
       <scope>provided</scope>
 <!-- just needed for compiling, not runtime -->
     </dependency>
+    
+    <dependency>
+	  <groupId>org.apache.hbase</groupId>
+	  <artifactId>hbase</artifactId>
+	  <version>0.90.3</version>
+    </dependency>
+
+	<dependency>
+		<groupId>org.apache.hadoop</groupId>
+		<artifactId>hadoop-core</artifactId>
+		<version>0.20.2</version>
+	</dependency>
   </dependencies>
   <reporting>
     <plugins>
